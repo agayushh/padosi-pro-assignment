@@ -39,8 +39,16 @@ export class ApiError extends Error {
 
 type Envelope<T> = { message: string; data: T };
 
+const REQUEST_TIMEOUT_MS = 12_000;
+
 let refreshInFlight: Promise<"ok" | "invalid" | "network"> | null = null;
 let onSessionLost: (() => void) | null = null;
+
+function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 export function setSessionLostHandler(handler: (() => void) | null) {
   onSessionLost = handler;
@@ -79,7 +87,7 @@ async function refreshTokens(): Promise<"ok" | "invalid" | "network"> {
       const refreshToken = await storage.getRefresh();
       if (!refreshToken) return "invalid" as const;
       try {
-        const response = await fetch(`${apiUrl()}/api/auth/refresh`, {
+        const response = await fetchWithTimeout(`${apiUrl()}/api/auth/refresh`, {
           method: "POST",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
           body: JSON.stringify({ refreshToken }),
@@ -112,13 +120,17 @@ async function request<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${apiUrl()}${path}`, {
+    response = await fetchWithTimeout(`${apiUrl()}${path}`, {
       method: options.method ?? "GET",
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
     });
   } catch {
-    throw new ApiError(0, "NETWORK", `We could not reach PadosiPro at ${apiUrl()}. Check that the API is running.`);
+    throw new ApiError(
+      0,
+      "NETWORK",
+      `We could not reach PadosiPro at ${apiUrl()}. Check that the API is running.`,
+    );
   }
 
   const payload = await response.json().catch(() => null);
