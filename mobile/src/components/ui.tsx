@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +17,16 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, space } from "../theme";
 
+type Measurable = {
+  measureInWindow: (callback: (x: number, y: number, width: number, height: number) => void) => void;
+};
+
+const RevealFieldContext = createContext<() => void>(() => {});
+
+export function useScrollFieldIntoView() {
+  return useContext(RevealFieldContext);
+}
+
 export function Screen({
   children,
   footer,
@@ -27,27 +38,80 @@ export function Screen({
   refreshing?: boolean;
   onRefresh?: () => void;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
+  const frameRef = useRef<View>(null);
+  const scrollOffset = useRef(0);
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+
+  const reveal = useCallback(() => {
+    const focused = TextInput.State.currentlyFocusedInput() as unknown as Measurable | null;
+    const frame = frameRef.current;
+    const scroll = scrollRef.current;
+    if (!focused?.measureInWindow || !frame || !scroll) return;
+
+    frame.measureInWindow((_frameX, frameY, _frameWidth, frameHeight) => {
+      focused.measureInWindow((_inputX, inputY, _inputWidth, inputHeight) => {
+        const visibleBottom = frameY + frameHeight - 12;
+        const overlap = inputY + inputHeight - visibleBottom;
+        if (overlap > 8) {
+          scroll.scrollTo({ y: scrollOffset.current + overlap + 16, animated: true });
+        }
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) => {
+      setKeyboardPadding(event.endCoordinates.height);
+    });
+    const hide = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardPadding(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (keyboardPadding === 0) return;
+    const timer = setTimeout(reveal, 60);
+    return () => clearTimeout(timer);
+  }, [keyboardPadding, reveal]);
+
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            onRefresh ? (
-              <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} />
-            ) : undefined
-          }
+    <RevealFieldContext.Provider value={reveal}>
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {children}
-        </ScrollView>
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <View ref={frameRef} style={styles.flex}>
+            <ScrollView
+              ref={scrollRef}
+              contentContainerStyle={[
+                styles.scroll,
+                keyboardPadding > 0 ? { paddingBottom: space.xl + keyboardPadding } : null,
+              ]}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                scrollOffset.current = event.nativeEvent.contentOffset.y;
+              }}
+              refreshControl={
+                onRefresh ? (
+                  <RefreshControl refreshing={Boolean(refreshing)} onRefresh={onRefresh} tintColor={colors.primary} />
+                ) : undefined
+              }
+            >
+              {children}
+            </ScrollView>
+          </View>
+          {footer && keyboardPadding === 0 ? <View style={styles.footer}>{footer}</View> : null}
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </RevealFieldContext.Provider>
   );
 }
 
@@ -92,17 +156,28 @@ export function TextField({
   prefix?: string;
 }) {
   const [hidden, setHidden] = useState(true);
+  const [focused, setFocused] = useState(false);
+  const reveal = useScrollFieldIntoView();
   const isSecure = secureTextEntry === true;
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputRow, error ? styles.inputError : null]}>
+      <View style={[styles.inputRow, focused && !error ? styles.inputFocused : null, error ? styles.inputError : null]}>
         {prefix ? <Text style={styles.prefix}>{prefix}</Text> : null}
         <TextInput
           placeholderTextColor={colors.textSecondary}
           style={[styles.input, input.multiline ? styles.multiline : null]}
           secureTextEntry={isSecure ? hidden : false}
           {...input}
+          onFocus={(event) => {
+            setFocused(true);
+            input.onFocus?.(event);
+            reveal();
+          }}
+          onBlur={(event) => {
+            setFocused(false);
+            input.onBlur?.(event);
+          }}
         />
         {isSecure ? (
           <Pressable accessibilityLabel={hidden ? "Show password" : "Hide password"} onPress={() => setHidden((value) => !value)} hitSlop={8}>
@@ -140,6 +215,40 @@ export function PrimaryButton({
     >
       {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.buttonText}>{label}</Text>}
     </Pressable>
+  );
+}
+
+export function ActionBar({
+  caption,
+  label,
+  onPress,
+  loading,
+  disabled,
+  secondaryLabel,
+  onSecondary,
+}: {
+  caption: string;
+  label: string;
+  onPress: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+}) {
+  return (
+    <View style={styles.actionRow}>
+      <View style={styles.actionCopy}>
+        <Text style={styles.actionCaption}>{caption}</Text>
+        {secondaryLabel && onSecondary ? (
+          <Pressable accessibilityRole="button" onPress={onSecondary} hitSlop={8}>
+            <Text style={styles.actionSecondary}>{secondaryLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      <View style={styles.actionButton}>
+        <PrimaryButton label={label} onPress={onPress} loading={loading} disabled={disabled} />
+      </View>
+    </View>
   );
 }
 
@@ -199,12 +308,22 @@ const styles = StyleSheet.create({
   scroll: { paddingHorizontal: space.lg, paddingTop: space.md, paddingBottom: space.xl, flexGrow: 1 },
   footer: {
     paddingHorizontal: space.lg,
-    paddingTop: space.sm,
-    paddingBottom: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.background,
+    paddingTop: 14,
+    paddingBottom: 10,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    shadowColor: "#101828",
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: -8 },
+    elevation: 16,
   },
+  actionRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  actionCopy: { flex: 1, gap: 2 },
+  actionCaption: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },
+  actionSecondary: { color: colors.primary, fontSize: 14, fontWeight: "700" },
+  actionButton: { minWidth: 148 },
   wordmark: { marginBottom: space.lg },
   wordmarkCompact: { marginBottom: 0 },
   brand: { color: colors.primary, fontSize: 13, fontWeight: "700", letterSpacing: 2.4 },
@@ -226,6 +345,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  inputFocused: { borderColor: colors.primary },
   inputError: { borderColor: colors.error },
   prefix: { color: colors.text, fontSize: 16, fontWeight: "600" },
   input: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: 12 },
@@ -234,7 +354,7 @@ const styles = StyleSheet.create({
   hint: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 6 },
   button: {
     minHeight: 52,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",

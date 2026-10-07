@@ -3,11 +3,13 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { apiUrl, setApiUrlOverride } from "../api/config";
 import { storage } from "../auth/storage";
 import { colors, radius, space } from "../theme";
+import { useScrollFieldIntoView } from "./ui";
 
 export function ServerField() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(apiUrl());
   const [saved, setSaved] = useState(false);
+  const reveal = useScrollFieldIntoView();
 
   async function save() {
     const next = value.trim().replace(/\/$/, "");
@@ -37,6 +39,8 @@ export function ServerField() {
             placeholder="http://192.168.1.10:3001"
             placeholderTextColor={colors.textSecondary}
             style={styles.input}
+            autoFocus
+            onFocus={reveal}
           />
           <Pressable style={styles.save} onPress={() => void save()}>
             <Text style={styles.saveText}>Save</Text>
