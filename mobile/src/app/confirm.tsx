@@ -3,7 +3,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { ApiError, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { Banner, Heading, LoadingState, MessageState, PrimaryButton, Screen, TextLink, Wordmark } from "../components/ui";
+import { ActionBar, Banner, Heading, LoadingState, MessageState, Screen, Wordmark } from "../components/ui";
 import { useDraft } from "../selection/DraftContext";
 import { colors, radius, space } from "../theme";
 
@@ -52,14 +52,14 @@ export default function ConfirmScreen() {
   return (
     <Screen
       footer={
-        <View style={styles.footer}>
-          <PrimaryButton
-            label={loading ? "Saving…" : "Confirm selection"}
-            onPress={() => void onConfirm()}
-            loading={loading}
-          />
-          <TextLink label="Back to edit" onPress={() => router.back()} />
-        </View>
+        <ActionBar
+          caption={selected.length === 1 ? "1 task ready" : `${selected.length} tasks ready`}
+          label={loading ? "Saving…" : "Confirm"}
+          onPress={() => void onConfirm()}
+          loading={loading}
+          secondaryLabel="Edit"
+          onSecondary={() => router.back()}
+        />
       }
     >
       <Wordmark />
@@ -84,7 +84,6 @@ export default function ConfirmScreen() {
 }
 
 const styles = StyleSheet.create({
-  footer: { gap: space.md },
   group: { marginBottom: space.md },
   category: {
     color: colors.primary,
@@ -96,7 +95,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,

@@ -1,6 +1,7 @@
 import { Redirect, router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { ApiError, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { Banner, Heading, LoadingState, MessageState, PrimaryButton, Screen, TextLink, Wordmark } from "../components/ui";
@@ -75,11 +76,22 @@ export default function HomeScreen() {
       {error ? <Banner message={error} /> : null}
 
       <View style={styles.profile}>
+        <View style={styles.profileTop}>
+          <Text style={styles.profileLabel}>Your details</Text>
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => router.push({ pathname: "/profile", params: { returnTo: "home" } })}
+            style={styles.edit}
+          >
+            <Text style={styles.editLabel}>Edit</Text>
+            <Feather name="chevron-right" size={16} color={colors.primary} />
+          </Pressable>
+        </View>
         <Text style={styles.profileName}>{user.name}</Text>
         <Text style={styles.profileLine}>{user.mobile}</Text>
         <Text style={styles.profileLine}>{user.address}</Text>
         {user.businessName ? <Text style={styles.profileLine}>{user.businessName}</Text> : null}
-        <TextLink label="Edit details" onPress={() => router.push({ pathname: "/profile", params: { returnTo: "home" } })} />
       </View>
 
       {error && !selection ? (
@@ -117,13 +129,17 @@ const styles = StyleSheet.create({
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   profile: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 16,
     gap: 4,
     marginBottom: space.lg,
   },
+  profileTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  profileLabel: { color: colors.textSecondary, fontSize: 12, fontWeight: "700", letterSpacing: 0.4 },
+  edit: { flexDirection: "row", alignItems: "center", gap: 2 },
+  editLabel: { color: colors.primary, fontSize: 14, fontWeight: "700" },
   profileName: { color: colors.text, fontSize: 18, fontWeight: "700" },
   profileLine: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   sectionRow: {
@@ -144,7 +160,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: 14,

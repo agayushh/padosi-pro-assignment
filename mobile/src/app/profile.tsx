@@ -1,10 +1,9 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Keyboard, StyleSheet, View } from "react-native";
 import { ApiError, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { Banner, Heading, LoadingState, PrimaryButton, Screen, TextField, TextLink, Wordmark } from "../components/ui";
-import { space } from "../theme";
+import { ActionBar, Banner, Heading, LoadingState, Screen, TextField, TextLink, Wordmark } from "../components/ui";
 import { addressError, businessNameError, mobileError, nameError } from "../validators";
 
 export default function ProfileScreen() {
@@ -29,6 +28,7 @@ export default function ProfileScreen() {
     if (nameError(name) || mobileError(mobile) || addressError(address) || businessNameError(businessName)) {
       return;
     }
+    Keyboard.dismiss();
     setLoading(true);
     try {
       await api.saveProfile({
@@ -49,14 +49,20 @@ export default function ProfileScreen() {
   return (
     <Screen
       footer={
-        <PrimaryButton
-          label={loading ? "Saving…" : firstVisit ? "Continue" : "Save details"}
+        <ActionBar
+          caption={firstVisit ? "Next you will choose tasks" : "This updates what we already have"}
+          label={loading ? "Saving…" : firstVisit ? "Continue" : "Save"}
           onPress={() => void onSubmit()}
           loading={loading}
+          secondaryLabel={!firstVisit || returnTo === "home" ? "Back" : undefined}
+          onSecondary={!firstVisit || returnTo === "home" ? () => router.back() : undefined}
         />
       }
     >
-      <Wordmark />
+      <View style={styles.top}>
+        <Wordmark compact />
+        <TextLink label="Log out" onPress={() => void signOut().then(() => router.replace("/login"))} />
+      </View>
       <Heading
         step={firstVisit ? "Step 1 of 2" : undefined}
         title="Tell us who you are"
@@ -99,16 +105,10 @@ export default function ProfileScreen() {
         placeholder="Optional"
         hint="Optional. Households can leave this blank. Add it if a business should appear on requests."
       />
-      <View style={styles.links}>
-        {!firstVisit || returnTo === "home" ? (
-          <TextLink label="Back" onPress={() => router.back()} />
-        ) : null}
-        <TextLink label="Log out" onPress={() => void signOut().then(() => router.replace("/login"))} />
-      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  links: { gap: space.md, marginTop: space.sm },
+  top: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 },
 });

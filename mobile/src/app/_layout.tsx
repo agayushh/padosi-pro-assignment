@@ -17,7 +17,9 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: colors.background },
               animation: "slide_from_right",
             }}
-          />
+          >
+            <Stack.Screen name="confirm" options={{ animation: "fade_from_bottom" }} />
+          </Stack>
         </DraftProvider>
       </AuthProvider>
     </SafeAreaProvider>

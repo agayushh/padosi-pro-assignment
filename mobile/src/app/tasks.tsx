@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ApiError, api } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
-import { Heading, LoadingState, MessageState, PrimaryButton, Screen, TextLink, Wordmark } from "../components/ui";
+import { ActionBar, Heading, LoadingState, MessageState, Screen, TextLink, Wordmark } from "../components/ui";
 import { useDraft } from "../selection/DraftContext";
 import { colors, radius, space } from "../theme";
 import type { Category, SelectedTask } from "../types";
@@ -76,8 +76,9 @@ export default function TasksScreen() {
   return (
     <Screen
       footer={
-        <PrimaryButton
-          label={selected.length === 0 ? "Pick at least one task" : `Continue · ${selected.length} selected`}
+        <ActionBar
+          caption={selected.length === 0 ? "Select anything that applies" : `${selected.length} selected`}
+          label="Review"
           disabled={selected.length === 0}
           onPress={() => router.push("/confirm")}
         />
@@ -130,7 +131,10 @@ export default function TasksScreen() {
       ) : (
         visible.map((category) => (
           <View key={category.id} style={styles.group}>
-            <Text style={styles.category}>{category.name}</Text>
+            <View style={styles.categoryRow}>
+              <Text style={styles.category}>{category.name}</Text>
+              <Text style={styles.categoryCount}>{category.tasks.length}</Text>
+            </View>
             <Text style={styles.categoryBody}>{category.description}</Text>
             {category.tasks.map((task) => {
               const picked = selectedIds.has(task.id);
@@ -179,7 +183,9 @@ const styles = StyleSheet.create({
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: "700" },
   emptyBody: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
   group: { marginBottom: space.lg },
-  category: { color: colors.primary, fontSize: 13, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  categoryRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  category: { color: colors.primary, fontSize: 13, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", flex: 1 },
+  categoryCount: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
   categoryBody: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4, marginBottom: 10 },
   row: {
     flexDirection: "row",
@@ -188,8 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: 12,
+    borderRadius: radius.lg,
+    padding: 14,
     marginBottom: 8,
   },
   rowSelected: { borderColor: colors.primary, backgroundColor: colors.mint },
